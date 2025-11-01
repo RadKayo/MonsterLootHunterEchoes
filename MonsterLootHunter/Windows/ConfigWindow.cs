@@ -1,9 +1,9 @@
 ﻿using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
-using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using MonsterLootHunter.Logic;
+using MonsterLootHunter.Services;
 using MonsterLootHunter.Utils;
 
 namespace MonsterLootHunter.Windows;
@@ -11,6 +11,7 @@ namespace MonsterLootHunter.Windows;
 public class ConfigWindow : Window, IDisposable
 {
     private readonly Configuration _configuration;
+    private readonly ItemFetchService _itemFetchService;
     private readonly float _scale;
     private float _minScale;
     private float _maxScale;
@@ -19,10 +20,11 @@ public class ConfigWindow : Window, IDisposable
     private bool _preferWikiData;
     private bool _appendData;
 
-    public ConfigWindow(Configuration configuration)
+    public ConfigWindow(Configuration configuration, ItemFetchService itemFetchService)
         : base(WindowConstants.ConfigWindowName, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoResize)
     {
         _configuration = configuration;
+        _itemFetchService = itemFetchService;
         _scale = ImGui.GetIO().FontGlobalScale;
         Size = new Vector2(250, 150) * _scale;
         SizeConstraints = new WindowSizeConstraints
@@ -60,7 +62,6 @@ public class ConfigWindow : Window, IDisposable
             if (ImGui.Checkbox("Include internal gatherable data", ref _appendData))
                 _configuration.AppendInternalData = _appendData;
             ImGui.SetCursorPosX(25 * _scale);
-            var f = new ImRaii.Color();
             ImGui.TextColored(new Vector4(234f, 217f, 28f, 255f).NormalizeToUnitRange(), "Select item again for change to take effect.");
             ImGui.SetCursorPosX(25 * _scale);
             ImGui.TextColored(new Vector4(234f, 217f, 28f, 255f).NormalizeToUnitRange(), "New data may provide map marker.");
@@ -73,6 +74,10 @@ public class ConfigWindow : Window, IDisposable
         ImGui.Text("Maximum size scale");
         ImGui.SameLine();
         ImGui.DragFloat("##max_size", ref _maxScale, 0.5f, 1.5f, 2f, "%.1f", ImGuiSliderFlags.None);
+
+        if (ImGui.Button("Clear cached loot data"))
+            _itemFetchService.ClearStoredLootData();
+        ImGui.TextColored(new Vector4(234f, 217f, 28f, 255f).NormalizeToUnitRange(), "Keep in mind that clearing the cached data will make data for all loot be fetched again from the wiki. Use this preferably when the plugin has been updated and data is not loading.");
 
         if (ImGui.Button("Save and close"))
             IsOpen = false;

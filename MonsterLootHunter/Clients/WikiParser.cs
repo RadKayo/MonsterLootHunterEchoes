@@ -31,8 +31,9 @@ namespace MonsterLootHunter.Clients
 
         public static Task<LootData> ParseResponse(HtmlDocument document, LootData lootData)
         {
-            var body = document.DocumentNode.QuerySelector("div#bodyContent");
-            var bodyContent = body.QuerySelector("div.mw-content-ltr div.mw-parser-output");
+            var body = document.DocumentNode;
+            var bodyContent = body.QuerySelector("div.mw-content-ltr div.mw-parser-output") ??
+                              body.QuerySelector("div.mw-content-ltr.mw-parser-output");
             var concurrentList = new ConcurrentBag<LootDrops>();
             Parallel.Invoke(() => { AddToBag(GetDutyDrops, bodyContent); },
                             () => { AddToBag(GetMonsterDropsFromTable, bodyContent); },
@@ -108,8 +109,7 @@ namespace MonsterLootHunter.Clients
         {
             var purchaseHeader = node.QuerySelectorAll("h3").ToList();
             var purchaseTopHeader = node.QuerySelectorAll("h2").ToList();
-            if (!purchaseHeader.Any(n => n.QuerySelector("span#Purchase") != null || n.QuerySelector("span#Purchased") != null || n.QuerySelector("span#Purchased_From") != null) ||
-                purchaseTopHeader.All(n => n.QuerySelector("span#Acquisition") == null))
+            if (!CheckContainsVendorInfo())
                 return [];
 
             var purchaseList = node.QuerySelector("table.npc tbody")?.QuerySelectorAll("tr").ToList();
@@ -136,6 +136,12 @@ namespace MonsterLootHunter.Clients
             });
 
             return vendors.AsEnumerable();
+
+            bool CheckContainsVendorInfo() =>
+                purchaseHeader.Any(n => n.InnerText.Contains("Purchase", StringComparison.InvariantCultureIgnoreCase)) ||
+                purchaseTopHeader.Any(n => n.InnerText.Contains("Acquisition")) ||
+                !purchaseHeader.Any(n => n.QuerySelector("span#Purchase") != null || n.QuerySelector("span#Purchased") != null || n.QuerySelector("span#Purchased_From") != null) ||
+                purchaseTopHeader.All(n => n.QuerySelector("span#Acquisition") == null);
         }
 
         private static LootDrops[] GetPossibleRecipe(HtmlNode node)
@@ -272,7 +278,8 @@ namespace MonsterLootHunter.Clients
                    select new LootDrops
                    {
                        MobName = columns.TryGet(nodes => nodes[0].ChildNodes[1].InnerText),
-                       MobLocation = $"{columns.TryGet(nodes => nodes[1].QuerySelectorAll("a").ToList()[0].InnerText)} - {columns.TryGet(nodes => nodes[1].QuerySelectorAll("a").ToList()[1].InnerText)}",
+                       MobLocation =
+                           $"{columns.TryGet(nodes => nodes[1].QuerySelectorAll("a").ToList()[0].InnerText)} - {columns.TryGet(nodes => nodes[1].QuerySelectorAll("a").ToList()[1].InnerText)}",
                        MobFlag = flagParsed.Count == 2 ? $"({flagParsed[0].Value},{flagParsed[1].Value})" : string.Empty,
                        MobLevel = columns.TryGet(nodes => nodes[2].ChildNodes[0].InnerText),
                    };
